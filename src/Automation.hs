@@ -13,6 +13,7 @@ import Graphics.Win32 (setCursorPos)
 import Data.Bifunctor (bimap)
 import EitherTransformer (EitherT(..))
 import Control.Monad.Trans.Class (MonadTrans (lift))
+import Text.Read (readMaybe)
 
 data Mode = Click | Move
 
@@ -35,11 +36,7 @@ mouseClick = do
     return ()
 
 -- loop :: IO () -> IO ()
--- loop action = do
---     _ <- forever $ do
---         threadDelay 100
---         action
---     return ()
+-- loop = loopWithDelay 100
 
 loopWithDelay :: Int -> IO () -> IO ()
 loopWithDelay delay action = do
@@ -63,12 +60,15 @@ runAutomation = do
     writeChan chan True
 
     modeAndSec <- runEitherT setup
+    timeout <- readTimeout
     actionT <- case modeAndSec of
         Left err -> error err
         Right (Click, second) -> forkIO $ loopWithDelay second mouseClick
         Right (Move, second) -> forkIO $ loopWithDelay second $ mouseMultiMove [(269, 1064), (943, 598), (725, 717), (1104, 809), (972, 728), (971, 940), (701, 992), (1800, 24)] (500 * 1000)
     listenerT <- forkIO $ listenKeyUntil chan $ fromIntegral vK_ESCAPE
-    timerT <- forkIO $ runTimer chan 10
+    timerT <- case timeout of
+        Left err -> error err
+        Right s -> forkIO $ runTimer chan s
 
     whileM $ do
         threadDelay 100
@@ -104,10 +104,10 @@ readDelay = do
         Just s -> return $ Right s
         Nothing -> return $ Left "Invalid second"
 
--- readTimeout :: EitherT String IO Int
--- readTimeout = do
---     lift $ putStrLn "Enter timeout in second:"
---     second <- lift getLine
---     EitherT $ case read second of
---         Just s -> return $ Right s
---         Nothing -> return $ Left "Invalid second"
+readTimeout :: IO (Either String Int)
+readTimeout = do
+    putStrLn "Enter timeout in second:"
+    second <- getLine
+    return $ case readMaybe second of
+        Just s -> Right s
+        Nothing -> Left "Invalid second"
