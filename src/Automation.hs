@@ -62,6 +62,9 @@ runAutomation = do
 
     modeAndSec <- runEitherT setup
     timeout <- readTimeout
+    putStrLn "Press ESC to stop"
+    putStrLn "Starting in 3 seconds"
+    threadDelay 3000000
     actionT <- case modeAndSec of
         Left err -> error err
         Right (Click, second) -> forkIO $ loopWithDelay second mouseClick
@@ -101,7 +104,7 @@ readDelay :: EitherT String IO Int
 readDelay = do
     lift $ putStrLn "Enter microsecond to delay:"
     second <- lift getLine
-    EitherT $ case read second of
+    EitherT $ case readMaybe second of
         Just s -> return $ Right s
         Nothing -> return $ Left "Invalid second"
 
