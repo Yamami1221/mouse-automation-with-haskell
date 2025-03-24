@@ -23,6 +23,7 @@ dependencies:
 - base >= 4.7 && < 5
 - Win32
 - extra
+- transformers
 
 ghc-options:
 - -Wall

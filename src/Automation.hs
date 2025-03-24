@@ -11,6 +11,10 @@ import Graphics.Win32.Key (getAsyncKeyState, vK_ESCAPE)
 import Timer (runTimer)
 import Graphics.Win32 (setCursorPos)
 import Data.Bifunctor (bimap)
+import EitherTransformer (EitherT(..))
+import Control.Monad.Trans.Class (MonadTrans (lift))
+
+data Mode = Click | Move
 
 type XPos = Int
 type YPos = Int
@@ -30,10 +34,17 @@ mouseClick = do
     _ <- sendInput [Mouse $ MOUSEINPUT 0 0 0 mOUSEEVENTF_LEFTDOWN 0 0, Mouse $ MOUSEINPUT 0 0 0 mOUSEEVENTF_LEFTUP 0 0]
     return ()
 
-loop :: IO () -> IO ()
-loop action = do
+-- loop :: IO () -> IO ()
+-- loop action = do
+--     _ <- forever $ do
+--         threadDelay 100
+--         action
+--     return ()
+
+loopWithDelay :: Int -> IO () -> IO ()
+loopWithDelay delay action = do
     _ <- forever $ do
-        threadDelay 100
+        threadDelay delay
         action
     return ()
 
@@ -50,14 +61,53 @@ runAutomation :: IO ()
 runAutomation = do
     chan <- newChan :: IO (Chan Bool)
     writeChan chan True
+
+    modeAndSec <- runEitherT setup
+    actionT <- case modeAndSec of
+        Left err -> error err
+        Right (Click, second) -> forkIO $ loopWithDelay second mouseClick
+        Right (Move, second) -> forkIO $ loopWithDelay second $ mouseMultiMove [(269, 1064), (943, 598), (725, 717), (1104, 809), (972, 728), (971, 940), (701, 992), (1800, 24)] (500 * 1000)
     listenerT <- forkIO $ listenKeyUntil chan $ fromIntegral vK_ESCAPE
-    actionT <- forkIO $ loop mouseClick
-    -- actionT <- forkIO $ loop $ mouseMultiMove [(269, 1064), (943, 598), (725, 717), (1104, 809), (972, 728), (971, 940), (701, 992), (1800, 24)] (500 * 1000)
     timerT <- forkIO $ runTimer chan 10
+
     whileM $ do
         threadDelay 100
         readChan chan
+
     killThread listenerT
     killThread actionT
     killThread timerT
     return ()
+
+setup :: EitherT String IO (Mode, Int)
+setup = do
+    mode <- selectMode
+    second <- readDelay
+    EitherT . return $ Right (mode, second)
+
+selectMode :: EitherT String IO Mode
+selectMode = do
+    lift $ putStrLn "Select mode:"
+    lift $ putStrLn "1. Click"
+    lift $ putStrLn "2. Move"
+    selection <- lift getLine
+    EitherT $ case selection of
+        "1" -> return $ Right Click
+        "2" -> return $ Right Move
+        _ -> return $ Left "Invalid mode"
+
+readDelay :: EitherT String IO Int
+readDelay = do
+    lift $ putStrLn "Enter microsecond to delay:"
+    second <- lift getLine
+    EitherT $ case read second of
+        Just s -> return $ Right s
+        Nothing -> return $ Left "Invalid second"
+
+-- readTimeout :: EitherT String IO Int
+-- readTimeout = do
+--     lift $ putStrLn "Enter timeout in second:"
+--     second <- lift getLine
+--     EitherT $ case read second of
+--         Just s -> return $ Right s
+--         Nothing -> return $ Left "Invalid second"
