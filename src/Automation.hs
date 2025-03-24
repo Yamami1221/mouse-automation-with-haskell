@@ -4,7 +4,8 @@ module Automation
 
 import System.Win32.Automation.Input (sendInput, INPUT(..))
 import System.Win32.Automation.Input.Mouse (mOUSEEVENTF_LEFTDOWN, mOUSEEVENTF_LEFTUP, MOUSEINPUT(..))
-import Control.Concurrent (forkIO, newChan, writeChan, readChan, Chan, threadDelay, killThread)
+import Control.Concurrent (forkIO, threadDelay, killThread)
+import Control.Concurrent.Chan (newChan, writeChan, readChan, Chan)
 import Control.Monad.Extra (whileM)
 import Control.Monad (forever)
 import Graphics.Win32.Key (getAsyncKeyState, vK_ESCAPE)
