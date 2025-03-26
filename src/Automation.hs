@@ -36,8 +36,8 @@ mouseClick = do
     _ <- sendInput [Mouse $ MOUSEINPUT 0 0 0 mOUSEEVENTF_LEFTDOWN 0 0, Mouse $ MOUSEINPUT 0 0 0 mOUSEEVENTF_LEFTUP 0 0]
     return ()
 
--- loop :: IO () -> IO ()
--- loop = loopWithDelay 100
+loop :: IO () -> IO ()
+loop = loopWithDelay 100
 
 loopWithDelay :: Int -> IO () -> IO ()
 loopWithDelay delay action = do
@@ -46,13 +46,12 @@ loopWithDelay delay action = do
         action
     return ()
 
-listenKeyUntil :: Chan Bool -> Int -> IO ()
-listenKeyUntil chan key = do
-    whileM $ do
-        threadDelay 100
-        status <- getAsyncKeyState key
-        return (status == 0)
-    writeChan chan False
+listenKeyAndWriteChan :: Chan Bool -> Int -> IO ()
+listenKeyAndWriteChan chan key = do
+    status <- getAsyncKeyState key
+    if status /= 0
+        then writeChan chan False
+        else writeChan chan True
     return ()
 
 runAutomation :: IO ()
@@ -69,7 +68,8 @@ runAutomation = do
         Left err -> error err
         Right (Click, second) -> forkIO $ loopWithDelay second mouseClick
         Right (Move, second) -> forkIO $ loopWithDelay second $ mouseMultiMove [(269, 1064), (943, 598), (725, 717), (1104, 809), (972, 728), (971, 940), (701, 992), (1800, 24)] (500 * 1000)
-    listenerT <- forkIO $ listenKeyUntil chan $ fromIntegral vK_ESCAPE
+    -- listenerT <- forkIO $ listenKeyUntil chan $ fromIntegral vK_ESCAPE
+    listenerT <- forkIO $ loop $ listenKeyAndWriteChan chan $ fromIntegral vK_ESCAPE
     timerT <- case timeout of
         Left err -> error err
         Right s -> forkIO $ runTimer chan s
